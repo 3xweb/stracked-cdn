@@ -22,12 +22,6 @@ async function build() {
   });
 
   const minified = await minify(result.outputFiles[0].text, {
-    mangle: {
-      properties: {
-        builtins: true,
-        reserved: ["constructor"],
-      },
-    },
     compress: {
       passes: 4,
       pure_funcs: ["Error"],
@@ -35,7 +29,6 @@ async function build() {
       arguments: true,
       drop_console: true,
       hoist_funs: true,
-      unsafe: true,
     },
     ecma: 2020,
     toplevel: true,
