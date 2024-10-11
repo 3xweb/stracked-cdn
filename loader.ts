@@ -1,4 +1,7 @@
 import { record } from "@rrweb/record";
+import { Encoder } from "msgpackr/pack";
+
+const encoder = new Encoder();
 
 type Response = {
   token: string;
@@ -41,7 +44,7 @@ type Response = {
   function runABTests(tests: Response["tests"]) {
     const currentUrl = new URL(window.location.href); // Usar URL para facilitar a manipulação de parâmetros
     const searchParams = currentUrl.search; // Obter os parâmetros da URL atual
-    
+
     tests.forEach((test) => {
       if (currentUrl.href.startsWith(test.entryUrl)) { // Usar startsWith para maior flexibilidade
         const randomIndex = Math.floor(Math.random() * test.variants.length);
@@ -93,17 +96,29 @@ type Response = {
     return selector;
   }
 
+  const cache = new Map();
+
+  function getCachedXPath(element: HTMLElement): string {
+    if (cache.has(element)) {
+      return cache.get(element);
+    }
+    const xpath = getXPath(element);
+    cache.set(element, xpath);
+
+    return xpath;
+  }
+
   const response = await checkForABTests(apiUrl, strackedId);
 
   if (response) {
-    runABTests(response.tests);
+    runABTests(response.tests ?? []);
 
     const queryParams = new URLSearchParams(window.location.search)
 
     const params = new URLSearchParams();
     params.append("token", response.token);
     params.append("path", window.location.pathname + window.location.search);
-    params.append("referrer", document.referrer);
+    if (document.referrer) params.append("referrer", document.referrer);
 
     if (queryParams.get("utm_source")) params.append("utm_source", queryParams.get("utm_source")!);
     if (queryParams.get("utm_medium")) params.append("utm_medium", queryParams.get("utm_medium")!);
@@ -116,7 +131,7 @@ type Response = {
     websocket.onopen = () => {
       record({
         emit(event) {
-          websocket.send(JSON.stringify({ type: "rrweb", data: event }));
+          websocket.send(encoder.encode({ type: "rrweb", data: event }));
         },
       }); // Iniciar a gravação de eventos para reprodução da sessão
 
@@ -137,30 +152,44 @@ type Response = {
       ];
 
       eventsToTrack.forEach((eventName) => {
+        let isAnimating = false;
+
         document.addEventListener(eventName, (e) => {
-          const target = e.target as HTMLElement;
-          const xpath = getXPath(target);
+          if (!isAnimating) {
+            isAnimating = true;
 
-          const { x, y } = e as MouseEvent;
+            requestAnimationFrame(() => {
+              const target = e.target as HTMLElement;
+              const xpath = getCachedXPath(target);
 
-          const { top, left, width, height } = target.getBoundingClientRect();
-          const relativeX = x - left;
-          const relativeY = y - top;
+              const { x, y } = e as MouseEvent;
 
-          const relativeXPercentage = (relativeX / width) * 100;
-          const relativeYPercentage = (relativeY / height) * 100;
+              const { top, left, width, height } = target.getBoundingClientRect();
+              const relativeX = x - left;
+              const relativeY = y - top;
 
-          websocket.send(
-            JSON.stringify({
-              type: "event",
-              data: {
-                type: eventName,
-                data: { xpath, relativeX, relativeY, relativeXPercentage, relativeYPercentage },
-              }
-            })
-          );
+              const relativeXPercentage = Math.round((relativeX / width) * 100);
+              const relativeYPercentage = Math.round((relativeY / height) * 100);
+
+              websocket.send(
+                encoder.encode({
+                  type: "event",
+                  data: {
+                    type: eventName,
+                    data: { xpath, relativeXPercentage, relativeYPercentage },
+                  }
+                })
+              );
+
+              isAnimating = false;
+            });
+          }
         });
       }); // Iniciar a gravação de eventos para gerear heatmaps
     };
+
+    window.addEventListener("beforeunload", () => {
+      websocket.close();
+    });
   }
 })();
