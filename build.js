@@ -3,7 +3,7 @@ import { minify } from "terser";
 import { writeFile } from "fs/promises";
 
 const checkABTestsAndTrackingUrl = process.env.CHECK_AB_TESTS_AND_TRACKING_URL ?? "https://app.stracked.com.br/api/check-ab-test-and-tracking";
-const trackingUrl = process.env.TRACKING_URL ?? "wss://tracking.stracked.com.br";
+const trackingUrl = process.env.TRACKING_URL ?? "wss://app.stracked.com.br/tracking";
 
 async function build() {
   const result = await esbuild.build({
