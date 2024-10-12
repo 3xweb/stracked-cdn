@@ -135,23 +135,16 @@ type Response = {
         },
       }); // Iniciar a gravação de eventos para reprodução da sessão
 
-      const eventsToTrack = [
+      const clickEvents = [
         "click",
         "dblclick",
         "mousedown",
         "mouseup",
-        "mousemove",
-        "mouseover",
-        "mouseout",
-        "scroll",
-        "wheel",
-        "submit",
         "touchstart",
-        "touchmove",
         "touchend",
       ];
 
-      eventsToTrack.forEach((eventName) => {
+      clickEvents.forEach((eventName) => {
         let isAnimating = false;
 
         document.addEventListener(eventName, (e) => {
@@ -187,6 +180,75 @@ type Response = {
         });
       }); // Iniciar a gravação de eventos para gerear heatmaps
     };
+
+    function debounce(func: Function, delay: number) {
+      let timeoutId: NodeJS.Timeout;
+    
+      return function (this: any, ...args: any[]) {
+        clearTimeout(timeoutId);
+
+        timeoutId = setTimeout(() => {
+          func.apply(this, args);
+        }, delay);
+      };
+    };
+
+    const moveEvents = [
+      "mousemove",
+      "mouseover",
+      "mouseout",
+      "scroll",
+      "wheel",
+      "touchmove",
+    ];
+
+    moveEvents.forEach((eventName) => {
+      document.addEventListener(eventName, debounce((e: Event) => {
+        const target = e.target as HTMLElement;
+        const xpath = getCachedXPath(target);
+
+        const { x, y } = e as MouseEvent;
+
+        const { top, left, width, height } = target.getBoundingClientRect();
+        const relativeX = x - left;
+        const relativeY = y - top;
+
+        const relativeXPercentage = Math.round((relativeX / width) * 100);
+        const relativeYPercentage = Math.round((relativeY / height) * 100);
+
+        websocket.send(
+          encoder.encode({
+            type: "event",
+            data: {
+              type: eventName,
+              data: { xpath, relativeXPercentage, relativeYPercentage },
+            }
+          })
+        );
+      }, 200));
+    }); // Iniciar a gravação de eventos para gerear heatmaps
+
+    document.addEventListener("submit", (e) => {
+      const target = e.target as HTMLFormElement;
+      const xpath = getCachedXPath(target);
+
+      const formData = new FormData(target);
+      const data: { [key: string]: FormDataEntryValue } = {};
+
+      for (const [key, value] of formData.entries()) {
+        data[key as string] = value;
+      }
+
+      websocket.send(
+        encoder.encode({
+          type: "event",
+          data: {
+            type: "submit",
+            data: { xpath, formData: data },
+          }
+        })
+      );
+    }); // Iniciar a gravação de eventos para gerear heatmaps
 
     window.addEventListener("beforeunload", () => {
       websocket.close();
