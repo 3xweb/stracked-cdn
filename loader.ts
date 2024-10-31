@@ -27,7 +27,7 @@ type Response = {
 
   async function checkForABTests(apiUrl: string, strackedId: string) {
     try {
-      const response = await fetch(`${apiUrl}?id=${strackedId}`);
+      const response = await fetch(`${apiUrl}?id=${strackedId}`, { credentials: "include" });
       if (!response.ok) {
         throw new Error("Network response was not ok");
       }
@@ -225,7 +225,7 @@ type Response = {
             }
           })
         );
-      }, 200));
+      }, 100));
     }); // Iniciar a gravação de eventos para gerear heatmaps
 
     document.addEventListener("submit", (e) => {
