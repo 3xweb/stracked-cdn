@@ -5,7 +5,7 @@
   "main": "loader.js",
   "type": "module",
   "scripts": {
-    "build": "node build.js && mkdir -p public && cp loader.js public/loader.js"
+    "build": "node build.js"
   },
   "devDependencies": {
     "@rrweb/record": "2.0.0-alpha.17",
